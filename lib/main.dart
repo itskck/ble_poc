@@ -19,6 +19,9 @@ class _AppState extends State<App> {
   late bool supported;
   late Stream<bool> available;
   late bool hasLEScan;
+  BluetoothDevice? device;
+  late bool connected;
+  String? services;
 
   @override
   void initState() {
@@ -53,11 +56,50 @@ class _AppState extends State<App> {
                   return Text(snapshot.toString());
                 },
               ),
+              if (device != null)
+                StreamBuilder(
+                  stream: device!.connected,
+                  initialData: const [],
+                  builder: (BuildContext context, AsyncSnapshot snapshot) {
+                    if (snapshot.data == true) {
+                      return Column(
+                        children: [
+                          Text('Device ${device!.name} connected '),
+                          StreamBuilder(
+                            stream: device!.services,
+                            builder: (context, snapshot) =>
+                                Text(snapshot.data.toString()),
+                          ),
+                        ],
+                      );
+                    } else {
+                      return Text('Device ${device!.name} disconected');
+                    }
+                  },
+                ),
               ElevatedButton(
                   onPressed: () => getBTDevices(),
                   child: const Text(
                     'get devices',
-                  ))
+                  )),
+              if (device != null)
+                ElevatedButton(
+                    onPressed: () async {
+                      if (device != null) {
+                        try {
+                          await device!.connect();
+                          services =
+                              (await device!.discoverServices()).toString();
+                          setState(() {});
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(e.toString())));
+                        }
+                      }
+                    },
+                    child: const Text(
+                      'Connect',
+                    ))
             ],
           ),
         ),
@@ -78,11 +120,21 @@ class _AppState extends State<App> {
 
   void getBTDevices() async {
     try {
-      Bluetooth.requestLEScan(BluetoothLEScanOptions(filters: [
-        BluetoothScanFilter(
-          name: 'MAJOR IV',
-        )
-      ], keepRepeatedDevices: true, acceptAllAdvertisements: false));
+      final whot = await FlutterWebBluetooth.instance
+          .requestDevice(RequestOptionsBuilder.acceptAllDevices());
+      // final req =
+      //     await Bluetooth.requestLEScan(BluetoothLEScanOptions(filters: [
+      //   BluetoothScanFilter(
+      //     services: null,
+      //     serviceData: null,
+      //     name: null,
+      //     namePrefix: null,
+      //     manufacturerData: null,
+      //   )
+      // ], keepRepeatedDevices: true, acceptAllAdvertisements: true));
+      setState(() {
+        device = whot;
+      });
     } catch (e) {
       print(e);
     }
