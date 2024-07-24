@@ -1,8 +1,8 @@
 import 'dart:collection';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_web_bluetooth/flutter_web_bluetooth.dart';
-import 'package:flutter_web_bluetooth/js_web_bluetooth.dart';
 
 void main() {
   runApp(const App());
@@ -22,6 +22,8 @@ class _AppState extends State<App> {
   BluetoothDevice? device;
   late bool connected;
   String? services;
+
+  Future<ByteData>? future;
 
   @override
   void initState() {
@@ -67,8 +69,53 @@ class _AppState extends State<App> {
                           Text('Device ${device!.name} connected '),
                           StreamBuilder(
                             stream: device!.services,
-                            builder: (context, snapshot) =>
-                                Text(snapshot.data.toString()),
+                            builder: (context,
+                                    AsyncSnapshot<List<BluetoothService>>
+                                        snapshot) =>
+                                Column(
+                              children: [
+                                Text(
+                                    'Service uuid: ${snapshot.data?.firstOrNull?.uuid}'),
+                                if (snapshot.data?.firstOrNull != null)
+                                  FutureBuilder<List<BluetoothCharacteristic>>(
+                                    future: snapshot.data?.firstOrNull
+                                        ?.getCharacteristics(),
+                                    initialData: const [],
+                                    builder: (BuildContext context,
+                                        AsyncSnapshot<
+                                                List<BluetoothCharacteristic>>
+                                            snapshot) {
+                                      return Column(
+                                        children: [
+                                          Text(
+                                              "Characterisistic uuid: ${snapshot.data?.firstOrNull!.uuid}"),
+                                          ElevatedButton(
+                                              onPressed: () async {
+                                                setState(() {
+                                                  future = snapshot
+                                                      .data?.firstOrNull!
+                                                      .readValue();
+                                                });
+
+                                                await future;
+                                              },
+                                              child: const Text('Refresh')),
+                                          FutureBuilder(
+                                            future: future,
+                                            builder: (BuildContext context,
+                                                AsyncSnapshot<ByteData>
+                                                    snapshot) {
+                                              print(snapshot.data?.buffer);
+                                              return Text(
+                                                  'Bytes: ${snapshot.data?.getUint8(0)}');
+                                            },
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  ),
+                              ],
+                            ),
                           ),
                         ],
                       );
@@ -120,8 +167,9 @@ class _AppState extends State<App> {
 
   void getBTDevices() async {
     try {
-      final whot = await FlutterWebBluetooth.instance
-          .requestDevice(RequestOptionsBuilder.acceptAllDevices());
+      final whot = await FlutterWebBluetooth.instance.requestDevice(
+          RequestOptionsBuilder.acceptAllDevices(
+              optionalServices: ['battery_service']));
       // final req =
       //     await Bluetooth.requestLEScan(BluetoothLEScanOptions(filters: [
       //   BluetoothScanFilter(
