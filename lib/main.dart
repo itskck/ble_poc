@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_web_bluetooth/flutter_web_bluetooth.dart';
+import 'package:flutter_web_bluetooth/web/js/js_supported.dart';
 
 void main() {
   runApp(const App());
@@ -51,83 +52,15 @@ class _AppState extends State<App> {
                   return Text('Available ${snapshot.data}');
                 },
               ),
-              StreamBuilder(
-                stream: FlutterWebBluetooth.instance.devices,
-                initialData: const {},
-                builder: (BuildContext context, AsyncSnapshot snapshot) {
-                  return Text(snapshot.toString());
-                },
-              ),
-              if (device != null)
-                StreamBuilder(
-                  stream: device!.connected,
-                  initialData: const [],
-                  builder: (BuildContext context, AsyncSnapshot snapshot) {
-                    if (snapshot.data == true) {
-                      return Column(
-                        children: [
-                          Text('Device ${device!.name} connected '),
-                          StreamBuilder(
-                            stream: device!.services,
-                            builder: (context,
-                                    AsyncSnapshot<List<BluetoothService>>
-                                        snapshot) =>
-                                Column(
-                              children: [
-                                Text(
-                                    'Service uuid: ${snapshot.data?.firstOrNull?.uuid}'),
-                                if (snapshot.data?.firstOrNull != null)
-                                  FutureBuilder<List<BluetoothCharacteristic>>(
-                                    future: snapshot.data?.firstOrNull
-                                        ?.getCharacteristics(),
-                                    initialData: const [],
-                                    builder: (BuildContext context,
-                                        AsyncSnapshot<
-                                                List<BluetoothCharacteristic>>
-                                            snapshot) {
-                                      return Column(
-                                        children: [
-                                          Text(
-                                              "Characterisistic uuid: ${snapshot.data?.firstOrNull!.uuid}"),
-                                          ElevatedButton(
-                                              onPressed: () async {
-                                                setState(() {
-                                                  future = snapshot
-                                                      .data?.firstOrNull!
-                                                      .readValue();
-                                                });
-
-                                                await future;
-                                              },
-                                              child: const Text('Refresh')),
-                                          FutureBuilder(
-                                            future: future,
-                                            builder: (BuildContext context,
-                                                AsyncSnapshot<ByteData>
-                                                    snapshot) {
-                                              print(snapshot.data?.buffer);
-                                              return Text(
-                                                  'Bytes: ${snapshot.data?.getUint8(0)}');
-                                            },
-                                          ),
-                                        ],
-                                      );
-                                    },
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      );
-                    } else {
-                      return Text('Device ${device!.name} disconected');
-                    }
-                  },
-                ),
               ElevatedButton(
                   onPressed: () => getBTDevices(),
                   child: const Text(
                     'get devices',
+                  )),
+              ElevatedButton(
+                  onPressed: () => getDevicesButJS(),
+                  child: const Text(
+                    'get devices but with JS',
                   )),
               if (device != null)
                 ElevatedButton(
@@ -180,9 +113,21 @@ class _AppState extends State<App> {
       //     manufacturerData: null,
       //   )
       // ], keepRepeatedDevices: true, acceptAllAdvertisements: true));
+      whot.watchAdvertisements();
       setState(() {
         device = whot;
       });
+    } catch (e) {
+      print(e);
+    }
+  }
+
+  void getDevicesButJS() async {
+    try {
+      context.callMethod('getDevices');
+
+      var state = JsObject.fromBrowserObject(context['state']);
+      print('device from js: ' + state['device']);
     } catch (e) {
       print(e);
     }
